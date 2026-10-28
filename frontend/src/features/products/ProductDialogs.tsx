@@ -1,4 +1,3 @@
-/** Focused product dialogs keep metadata, stock, history, and deletion as separate use cases. */
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'

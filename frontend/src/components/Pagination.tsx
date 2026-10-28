@@ -1,4 +1,3 @@
-/** Pagination renders server metadata consistently for products and orders. */
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 /** Navigation is bounded by the complete server result and remains usable on an empty page. */

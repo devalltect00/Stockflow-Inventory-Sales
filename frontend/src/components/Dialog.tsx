@@ -1,4 +1,3 @@
-/** Native dialog supplies focus trapping, Escape handling, and focus restoration without a UI framework. */
 import { useEffect, useId, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'

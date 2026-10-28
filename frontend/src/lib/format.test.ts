@@ -1,4 +1,3 @@
-/** Money and movement formatting tests avoid locale-fragile spacing assumptions. */
 import { expect, it } from 'vitest'
 import { orderNumber, relativeTime, rupiah } from './format'
 

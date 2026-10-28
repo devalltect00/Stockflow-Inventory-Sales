@@ -1,4 +1,3 @@
-/** Inventory workspace: global summary, debounced server search, pagination, and product actions. */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {

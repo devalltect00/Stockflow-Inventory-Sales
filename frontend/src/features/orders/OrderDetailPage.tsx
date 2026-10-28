@@ -1,4 +1,3 @@
-/** Reload-safe order detail shows authoritative prices and a confirmation before restoration. */
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Check, CircleCheck, RotateCcw } from 'lucide-react'
@@ -9,7 +8,6 @@ import { Dialog } from '../../components/Dialog'
 import { ErrorNotice, TableSkeleton } from '../../components/Feedback'
 import { dateTime, orderNumber, rupiah } from '../../lib/format'
 
-/** OrderDetailPage invalidates inventory on cancellation so navigating back shows restored balances. */
 export function OrderDetailPage() {
   const { id } = useParams()
   const orderID = Number(id)

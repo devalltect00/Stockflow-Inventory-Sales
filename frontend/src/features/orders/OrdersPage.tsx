@@ -1,4 +1,3 @@
-/** Persisted order browsing makes sample and newly-created orders accessible after reload. */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowUpRight, Plus, ShoppingBag } from 'lucide-react'
@@ -9,7 +8,6 @@ import { EmptyState, ErrorNotice, TableSkeleton } from '../../components/Feedbac
 import { Pagination } from '../../components/Pagination'
 import { dateTime, orderNumber, rupiah } from '../../lib/format'
 
-/** OrdersPage fetches paginated order headers; detailed item snapshots live on the detail route. */
 export function OrdersPage() {
   const [page, setPage] = useState(1)
   const query = useQuery({

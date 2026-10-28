@@ -1,4 +1,3 @@
-/** Pure validation tests cover the input shapes that must never reach stock writes. */
 import { describe, expect, it } from 'vitest'
 import { orderSchema, productSchema, quantitySchema, stockSchema } from './validation'
 

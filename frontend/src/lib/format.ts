@@ -1,4 +1,3 @@
-/** Deterministic display helpers keep money and dates consistent across screens. */
 const rupiahFormatter = new Intl.NumberFormat('id-ID', {
   style: 'currency',
   currency: 'IDR',

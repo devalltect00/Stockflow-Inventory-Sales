@@ -1,4 +1,3 @@
-/** Shared accessible feedback for loading, empty results, and recoverable backend failures. */
 import { AlertCircle, Inbox, RotateCcw } from 'lucide-react'
 import { ApiError } from '../api/client'
 

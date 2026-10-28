@@ -1,4 +1,3 @@
-/** The order form submits identities and quantities, then navigates to the committed server result. */
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -11,14 +10,12 @@ import { ErrorNotice, FieldError } from '../../components/Feedback'
 import { rupiah } from '../../lib/format'
 import { fieldErrors, orderSchema, quantitySchema } from '../../lib/validation'
 
-/** Draft item keys remain stable when an earlier row is removed. */
 interface DraftItem {
   key: number
   sku: string
   qty: string
 }
 
-/** CreateOrderPage handles validation and SKU-specific conflicts without trusting local availability. */
 export function CreateOrderPage() {
   const navigate = useNavigate()
   const refresh = useRefreshInventory()

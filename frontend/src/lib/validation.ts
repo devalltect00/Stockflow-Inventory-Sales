@@ -1,4 +1,3 @@
-/** Pure form rules mirror the Go boundary; the backend always revalidates independently. */
 import { z } from 'zod'
 
 /** PostgreSQL INTEGER values must stay in range even when JavaScript could hold more. */
