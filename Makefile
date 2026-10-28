@@ -1,5 +1,5 @@
 ############################
-# Stackflow
+# StockFlow
 ############################
 
 .DEFAULT_GOAL := help
@@ -18,7 +18,7 @@ c-up:
 	$(DOCKER_COMPOSE) up -d
 
 c-build:
-	$(DOCKER_COMPOSE) up build-d
+	$(DOCKER_COMPOSE) up -d --build
 
 c-down:
 	$(DOCKER_COMPOSE) down
@@ -43,7 +43,7 @@ c-stop-all:
 	docker ps -q | xargs -r docker stop
 
 c-backend-test:
-	docker compose --profile test run --build --rm backend-tests
+	$(DOCKER_COMPOSE) --profile test run --build --rm backend-tests
 
 help:
 	@echo "Stockflow - makefile commands"

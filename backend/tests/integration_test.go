@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"stockflow/backend/internal/database"
 	"stockflow/backend/internal/httpapi"
 	"stockflow/backend/internal/inventory"
+	"stockflow/backend/internal/orders"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -163,5 +165,186 @@ func TestStockAdjustmentLedger(t *testing.T) {
 	}
 	if f.balance(t, p.SKU) != 2 || f.counts(t) != after {
 		t.Fatal("rejected overdraw changed state")
+	}
+}
+func TestOrderPricesCancellationAndHistory(t *testing.T) {
+	f := setup(t)
+	p := f.product(t, "TEST-SALE", 8)
+	before := f.counts(t)
+	status, body := f.request(t, "POST", "/api/orders", `{"customer":"Happy customer","items":[{"sku":"TEST-SALE","qty":3}]}`)
+	if status != 201 {
+		t.Fatalf("order: %d %s", status, body)
+	}
+	var order orders.Order
+	if err := json.Unmarshal(body, &order); err != nil {
+		t.Fatal(err)
+	}
+	if order.Total != 45000 || len(order.Items) != 1 || order.Items[0].UnitPrice != 15000 || f.balance(t, p.SKU) != 5 || f.counts(t)[2] != before[2]+1 {
+		t.Fatal("order did not use server prices and write stock movement")
+	}
+	status, body = f.request(t, "POST", fmt.Sprintf("/api/orders/%d/cancel", order.ID), "")
+	if status != 200 || f.balance(t, p.SKU) != 8 {
+		t.Fatalf("cancel: %d %s", status, body)
+	}
+	after := f.counts(t)
+	status, body = f.request(t, "POST", fmt.Sprintf("/api/orders/%d/cancel", order.ID), "")
+	if status != 409 || !bytes.Contains(body, []byte("ORDER_ALREADY_CANCELLED")) || f.balance(t, p.SKU) != 8 || f.counts(t) != after {
+		t.Fatalf("repeat cancel: %d %s", status, body)
+	}
+	status, body = f.request(t, "DELETE", fmt.Sprintf("/api/products/%d", p.ID), "")
+	if status != 409 || !bytes.Contains(body, []byte("PRODUCT_HAS_HISTORY")) {
+		t.Fatalf("delete history: %d %s", status, body)
+	}
+}
+
+func TestConcurrentOrdersNeverOversell(t *testing.T) {
+	f := setup(t)
+	f.product(t, "TEST-RACE", 10)
+	before := f.counts(t)
+	var success, conflict atomic.Int32
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	failures := make(chan string, 20)
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			response, err := http.Post(f.server.URL+"/api/orders", "application/json", strings.NewReader(`{"customer":"Concurrent buyer","items":[{"sku":"TEST-RACE","qty":1}]}`))
+			if err != nil {
+				failures <- err.Error()
+				return
+			}
+			defer response.Body.Close()
+			if response.StatusCode == 201 {
+				success.Add(1)
+			} else if response.StatusCode == 409 {
+				conflict.Add(1)
+			} else {
+				body, _ := io.ReadAll(response.Body)
+				failures <- fmt.Sprintf("status %d: %s", response.StatusCode, body)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(failures)
+	for failure := range failures {
+		t.Error(failure)
+	}
+	if success.Load() != 10 || conflict.Load() != 10 || f.balance(t, "TEST-RACE") != 0 || f.counts(t) != [3]int{before[0] + 10, before[1] + 10, before[2] + 10} {
+		t.Fatalf("oversell or ledger mismatch: successes=%d conflicts=%d stock=%d counts=%v", success.Load(), conflict.Load(), f.balance(t, "TEST-RACE"), f.counts(t))
+	}
+}
+
+func TestConcurrentCancellationRestoresOnce(t *testing.T) {
+	f := setup(t)
+	f.product(t, "TEST-CANCEL", 5)
+	status, body := f.request(t, "POST", "/api/orders", `{"customer":"Concurrent cancellation","items":[{"sku":"TEST-CANCEL","qty":2}]}`)
+	if status != 201 {
+		t.Fatalf("order: %d %s", status, body)
+	}
+	var order orders.Order
+	if err := json.Unmarshal(body, &order); err != nil {
+		t.Fatal(err)
+	}
+	before := f.counts(t)
+	var success, conflict atomic.Int32
+	var wg sync.WaitGroup
+	failures := make(chan string, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			response, err := http.Post(fmt.Sprintf("%s/api/orders/%d/cancel", f.server.URL, order.ID), "application/json", nil)
+			if err != nil {
+				failures <- err.Error()
+				return
+			}
+			defer response.Body.Close()
+			if response.StatusCode == 200 {
+				success.Add(1)
+			} else if response.StatusCode == 409 {
+				conflict.Add(1)
+			} else {
+				failures <- fmt.Sprintf("unexpected cancellation status %d", response.StatusCode)
+			}
+		}()
+	}
+	wg.Wait()
+	close(failures)
+	for failure := range failures {
+		t.Error(failure)
+	}
+	if success.Load() != 1 || conflict.Load() != 7 || f.balance(t, "TEST-CANCEL") != 5 || f.counts(t)[2] != before[2]+1 {
+		t.Fatal("cancellation restored more than once")
+	}
+}
+
+func TestValidationAndCatalogPages(t *testing.T) {
+	f := setup(t)
+	before := f.counts(t)
+	for _, body := range []string{`{"customer":"X","items":[]}`, `{"customer":"X","items":[{"sku":"MISSING","qty":1}]}`, `{"customer":"X","items":[{"sku":"KB-001","qty":0}]}`, `{"customer":"X","items":[{"sku":"KB-001","qty":1},{"sku":"KB-001","qty":1}]}`, `{"customer":"X","items":[{"sku":"KB-001","qty":1,"unit_price":1}]}`} {
+		status, response := f.request(t, "POST", "/api/orders", body)
+		if status != 400 {
+			t.Errorf("expected validation: %d %s", status, response)
+		}
+	}
+	if f.counts(t) != before {
+		t.Fatal("invalid request wrote rows")
+	}
+	status, body := f.request(t, "GET", "/api/products?search=not-a-real-product", "")
+	if status != 200 || !bytes.Contains(body, []byte(`"data":[]`)) || !bytes.Contains(body, []byte(`"total":0`)) {
+		t.Fatalf("empty page: %d %s", status, body)
+	}
+	status, body = f.request(t, "GET", "/api/products?search=logitech&limit=1&page=2", "")
+	var page inventory.ProductPage
+	if err := json.Unmarshal(body, &page); err != nil {
+		t.Fatal(err)
+	}
+	if status != 200 || page.Total != 3 || len(page.Data) != 1 {
+		t.Fatalf("search pagination: %d %s", status, body)
+	}
+	status, body = f.request(t, "GET", "/api/products?limit=0", "")
+	if status != 400 {
+		t.Fatalf("unbounded page: %d %s", status, body)
+	}
+}
+
+func TestDatabaseFailureRollsBack(t *testing.T) {
+	f := setup(t)
+	f.product(t, "TEST-FAIL", 5)
+	before := f.counts(t)
+	// A fixture-only trigger simulates a persistence failure after the product and item writes.
+	_, err := f.pool.Exec(context.Background(), `CREATE FUNCTION reject_test_movement() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.note LIKE 'Sales order%' THEN RAISE EXCEPTION 'simulated movement failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_test_movement BEFORE INSERT ON stock_movements FOR EACH ROW EXECUTE FUNCTION reject_test_movement()`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, body := f.request(t, "POST", "/api/orders", `{"customer":"Failure customer","items":[{"sku":"TEST-FAIL","qty":2}]}`)
+	if status != 500 || bytes.Contains(body, []byte("simulated movement failure")) {
+		t.Fatalf("failure boundary: %d %s", status, body)
+	}
+	if f.balance(t, "TEST-FAIL") != 5 || f.counts(t) != before {
+		t.Fatal("database error partially committed the order")
+	}
+}
+
+func TestLargeInventoryValuePreservesIntegerPrecision(t *testing.T) {
+	f := setup(t)
+	// Direct fixture setup reaches the numeric boundary without millions of stock operations.
+	if _, err := f.pool.Exec(context.Background(), `INSERT INTO products(sku,name,price,stock) VALUES ('HUGE-A','Large valuation fixture',2147483647,2147483647),('HUGE-B','Large valuation fixture',2147483647,2147483647),('HUGE-C','Large valuation fixture',2147483647,2147483647)`); err != nil {
+		t.Fatal(err)
+	}
+	status, body := f.request(t, "GET", "/api/products/summary", "")
+	var summary inventory.Summary
+	if err := json.Unmarshal(body, &summary); err != nil {
+		t.Fatal(err)
+	}
+	var expected string
+	if err := f.pool.QueryRow(context.Background(), `SELECT sum(price::bigint*stock)::text FROM products`).Scan(&expected); err != nil {
+		t.Fatal(err)
+	}
+	if status != 200 || summary.TotalStockValue != expected {
+		t.Fatalf("inexact valuation: %d %s", status, body)
 	}
 }

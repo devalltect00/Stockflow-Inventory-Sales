@@ -180,11 +180,18 @@ app startup. Each integration test creates its own database schema and removes
 it afterward.
 
 The current tests cover product price validation, order input validation, and
-two database cases:
+eight database integration cases:
 
 - An insufficient multi-item order leaves stock, orders, items, and movements unchanged.
 - A successful stock adjustment updates stock and writes a movement; a rejected
   overdraw changes neither.
+- Orders use server prices, cancellations restore stock, and products with history
+  cannot be deleted.
+- Concurrent orders cannot sell more stock than is available.
+- Concurrent cancellation restores stock only once.
+- Invalid orders are rejected, and product search and pagination return the expected results.
+- A database failure during order creation rolls back all writes.
+- Large inventory totals keep their integer precision.
 
 To run them locally in CMD, start the Docker database, then run from the project
 root:
@@ -239,3 +246,14 @@ command on pushes and pull requests.
 - Successful frontend mutations refresh the affected TanStack Query data,
   including the product list and summary cards.
 
+## Possible improvements
+
+Add login and sign-up with administrator approval or invitations. Registering an
+account should not automatically grant access. Permissions would control who can
+view inventory, edit products, adjust stock, and create or cancel orders. These
+checks would apply to backend API requests as well as the frontend.
+
+## Time spent
+
+Estimated effort: about one working day, roughly 8 hours including breaks.
+This is an estimate; work sessions and breaks were not timed separately.
