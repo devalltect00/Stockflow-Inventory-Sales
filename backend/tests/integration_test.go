@@ -1,4 +1,3 @@
-// Each test uses its own PostgreSQL schema.
 package tests
 
 import (
@@ -94,7 +93,6 @@ func (f *fixture) request(t *testing.T, method, path, body string) (int, []byte)
 	return response.StatusCode, data
 }
 
-// Opening stock goes through the API so it also creates a movement.
 func (f *fixture) product(t *testing.T, sku string, stock int) inventory.Product {
 	t.Helper()
 	status, body := f.request(t, "POST", "/api/products", fmt.Sprintf(`{"sku":%q,"name":"Test product","price":15000}`, sku))
@@ -114,7 +112,6 @@ func (f *fixture) product(t *testing.T, sku string, stock int) inventory.Product
 	return product
 }
 
-// Counts orders, order items, and stock movements, in that order.
 func (f *fixture) counts(t *testing.T) [3]int {
 	t.Helper()
 	var counts [3]int

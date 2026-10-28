@@ -1,3 +1,4 @@
+// This file contains PostgreSQL catalog queries and atomic, ledger-backed stock mutations.
 package inventory
 
 import (
@@ -84,7 +85,7 @@ func (s *Store) Create(ctx context.Context, in ProductInput) (Product, error) {
 	if in.IsActive != nil {
 		active = *in.IsActive
 	}
-	p, err := scanProduct(s.pool.QueryRow(ctx, `INSERT INTO products AS p(sku,name,price,is_active) VALUES($1,$2,$3,$4) RETURNING p.id,p.sku,p.name,p.price,p.stock,p.is_active,p.created_at,NULL::timestamptz`, in.SKU, in.Name, in.Price, active))
+	p, err := scanProduct(s.pool.QueryRow(ctx, `INSERT INTO products AS p(sku,name,price,is_active) VALUES($1,$2,$3,$4) RETURNING p.id,p.sku,p.name,p.price,p.stock,p.is_active,p.created_at,NULL::timestamptz`, in.SKU, in.Name, *in.Price, active))
 	return p, catalogError(err)
 }
 
@@ -104,14 +105,15 @@ func (s *Store) Update(ctx context.Context, id int, in ProductInput) (Product, e
 	if sku != in.SKU {
 		return Product{}, apperror.Conflict("SKU_IMMUTABLE", "SKU cannot be changed after creation.")
 	}
-	_, err = tx.Exec(ctx, `UPDATE products SET name=$2,price=$3,is_active=COALESCE($4,is_active) WHERE id=$1`, id, in.Name, in.Price, in.IsActive)
+	_, err = tx.Exec(ctx, `UPDATE products SET name=$2,price=$3,is_active=COALESCE($4,is_active) WHERE id=$1`, id, in.Name, *in.Price, in.IsActive)
 	if err != nil {
 		return Product{}, catalogError(err)
 	}
-	if err = tx.Commit(ctx); err != nil {
+	p, err := scanProduct(tx.QueryRow(ctx, `SELECT `+productColumns+` FROM products p WHERE p.id=$1`, id))
+	if err != nil {
 		return Product{}, err
 	}
-	return s.Get(ctx, id)
+	return p, tx.Commit(ctx)
 }
 
 // Delete locks the product so concurrent ledger writes cannot bypass the history guard.
@@ -205,7 +207,7 @@ func (s *Store) Movements(ctx context.Context, id int) ([]Movement, error) {
 // Summary computes global counts and valuation in PostgreSQL, never from a paginated UI list.
 func (s *Store) Summary(ctx context.Context) (Summary, error) {
 	var out Summary
-	err := s.pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE is_active),COALESCE(sum(price::bigint*stock),0),count(*) FILTER(WHERE stock<=10) FROM products`).Scan(&out.TotalProducts, &out.ActiveProducts, &out.TotalStockValue, &out.LowStockCount)
+	err := s.pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE is_active),COALESCE(sum(price::bigint*stock),0)::text,count(*) FILTER(WHERE stock<=10) FROM products`).Scan(&out.TotalProducts, &out.ActiveProducts, &out.TotalStockValue, &out.LowStockCount)
 	return out, err
 }
 

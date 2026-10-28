@@ -11,8 +11,8 @@ DB_SERVICE := db
 DB_USER := stockflow
 DB_NAME := stockflow
 
-.PHONY: help c-up c-build c-down c-stop \
-				c-restart c-db c-clean c-stop-all
+.PHONY: help c-up c-build c-down c-stop c-restart \
+				c-db c-clean c-stop-all c-backend-test
 
 c-up:
 	$(DOCKER_COMPOSE) up -d
@@ -42,14 +42,18 @@ c-clean:
 c-stop-all:
 	docker ps -q | xargs -r docker stop
 
+c-backend-test:
+	docker compose --profile test run --build --rm backend-tests
+
 help:
 	@echo "Stockflow - makefile commands"
 	@echo ""
-	@echo "c-up       "
-	@echo "c-build    "
-	@echo "c-down     "
-	@echo "c-stop     "
-	@echo "c-restart  "
-	@echo "c-db       "
-	@echo "c-clean    "
-	@echo "c-stop-all "
+	@echo "c-up           "
+	@echo "c-build        "
+	@echo "c-down         "
+	@echo "c-stop         "
+	@echo "c-restart      "
+	@echo "c-db           "
+	@echo "c-clean        "
+	@echo "c-stop-all     "
+	@echo "c-backend-test "

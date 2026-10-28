@@ -27,7 +27,7 @@ type Product struct {
 type ProductInput struct {
 	SKU      string `json:"sku"`
 	Name     string `json:"name"`
-	Price    int    `json:"price"`
+	Price    *int   `json:"price"`
 	IsActive *bool  `json:"is_active,omitempty"`
 }
 
@@ -42,7 +42,7 @@ func (in *ProductInput) Validate() error {
 	if utf8.RuneCountInString(in.Name) < 1 || utf8.RuneCountInString(in.Name) > 160 {
 		fields["name"] = "Name must contain 1–160 characters."
 	}
-	if in.Price < 0 || in.Price > MaxInteger {
+	if in.Price == nil || *in.Price < 0 || *in.Price > MaxInteger {
 		fields["price"] = "Price must be an integer between 0 and 2147483647 IDR."
 	}
 	if len(fields) > 0 {
@@ -106,8 +106,9 @@ type ProductPage struct {
 
 // Summary aggregates the entire inventory, independent of current filters and pages.
 type Summary struct {
-	TotalProducts   int   `json:"total_products"`
-	ActiveProducts  int   `json:"active_products"`
-	TotalStockValue int64 `json:"total_stock_value"`
-	LowStockCount   int   `json:"low_stock_count"`
+	TotalProducts  int `json:"total_products"`
+	ActiveProducts int `json:"active_products"`
+	// Decimal text preserves exact whole-IDR valuation beyond JavaScript's safe integer range.
+	TotalStockValue string `json:"total_stock_value"`
+	LowStockCount   int    `json:"low_stock_count"`
 }
