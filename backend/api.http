@@ -1,0 +1,198 @@
+@baseUrl = http://localhost:8080/api
+@productId = {{createProduct.response.body.$.id}}
+@productSku = {{createProduct.response.body.$.sku}}
+@orderId = {{createOrder.response.body.$.id}}
+@unusedProductId = {{createUnusedProduct.response.body.$.id}}
+
+# Send requests in order. Successful writes remain in the database.
+
+### Health
+GET {{baseUrl}}/health
+
+### Products
+GET {{baseUrl}}/products?search=&page=1&limit=12&filter=all
+
+### Search active products
+GET {{baseUrl}}/products?search=logitech&page=1&limit=12&filter=active
+
+### Low stock
+GET {{baseUrl}}/products?filter=low-stock&page=1&limit=12
+
+### Inventory summary
+GET {{baseUrl}}/products/summary
+
+### Create product
+# @name createProduct
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "sku": "TEST-{{$guid}}",
+  "name": "Wireless keyboard",
+  "price": 150000,
+  "is_active": true
+}
+
+### Update product
+PUT {{baseUrl}}/products/{{productId}}
+Content-Type: application/json
+
+{
+  "sku": "{{productSku}}",
+  "name": "Wireless keyboard - updated",
+  "price": 175000,
+  "is_active": true
+}
+
+### Stock in
+POST {{baseUrl}}/products/{{productId}}/stock
+Content-Type: application/json
+
+{
+  "type": "in",
+  "qty": 10,
+  "note": "Supplier delivery"
+}
+
+### Stock out
+POST {{baseUrl}}/products/{{productId}}/stock
+Content-Type: application/json
+
+{
+  "type": "out",
+  "qty": 2,
+  "note": "Damaged units"
+}
+
+### Insufficient stock (409)
+POST {{baseUrl}}/products/{{productId}}/stock
+Content-Type: application/json
+
+{
+  "type": "out",
+  "qty": 2147483647,
+  "note": "Overdraw check"
+}
+
+### Movement history
+GET {{baseUrl}}/products/{{productId}}/movements
+
+### Create order
+# @name createOrder
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer": "PT Sinar Jaya",
+  "items": [
+    { "sku": "{{productSku}}", "qty": 3 }
+  ]
+}
+
+### Insufficient order stock (409)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer": "PT Sinar Jaya",
+  "items": [
+    { "sku": "{{productSku}}", "qty": 2147483647 }
+  ]
+}
+
+### Order detail
+GET {{baseUrl}}/orders/{{orderId}}
+
+### Orders
+GET {{baseUrl}}/orders?page=1&limit=12
+
+### Cancel order
+POST {{baseUrl}}/orders/{{orderId}}/cancel
+
+### Already cancelled (409)
+POST {{baseUrl}}/orders/{{orderId}}/cancel
+
+### Restored stock (8 units after one pass)
+GET {{baseUrl}}/products?search={{productSku}}&page=1&limit=12&filter=all
+
+### Product with history (409)
+DELETE {{baseUrl}}/products/{{productId}}
+
+### Duplicate SKU (409)
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "sku": "{{productSku}}",
+  "name": "Wireless keyboard",
+  "price": 175000,
+  "is_active": true
+}
+
+### Invalid stock quantity (400)
+POST {{baseUrl}}/products/{{productId}}/stock
+Content-Type: application/json
+
+{
+  "type": "in",
+  "qty": 0,
+  "note": "Quantity check"
+}
+
+### Empty order (400)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer": "PT Sinar Jaya",
+  "items": []
+}
+
+### Duplicate order items (400)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer": "PT Sinar Jaya",
+  "items": [
+    { "sku": "{{productSku}}", "qty": 1 },
+    { "sku": "{{productSku}}", "qty": 2 }
+  ]
+}
+
+### Unknown SKU (400)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer": "PT Sinar Jaya",
+  "items": [
+    { "sku": "MISSING-{{$guid}}", "qty": 1 }
+  ]
+}
+
+### Client-supplied price (400)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer": "PT Sinar Jaya",
+  "items": [
+    { "sku": "{{productSku}}", "qty": 1, "unit_price": 1 }
+  ]
+}
+
+### Create unused product
+# @name createUnusedProduct
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "sku": "UNUSED-{{$guid}}",
+  "name": "Spare USB cable",
+  "price": 45000,
+  "is_active": true
+}
+
+### Delete unused product (204)
+DELETE {{baseUrl}}/products/{{unusedProductId}}

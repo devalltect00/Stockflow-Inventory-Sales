@@ -1,0 +1,2 @@
+# Keep cross-platform source and scripts deterministic in Windows and Linux checkouts.
+* text=auto eol=lf

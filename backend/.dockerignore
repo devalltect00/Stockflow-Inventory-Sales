@@ -1,0 +1,4 @@
+# Keep test artifacts and local executables out of the service image.
+bin
+*.test
+*.log
