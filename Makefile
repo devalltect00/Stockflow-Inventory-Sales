@@ -35,6 +35,10 @@ c-db:
 c-clean:
 	$(DOCKER_COMPOSE) down -v
 
+
+# docker ps -q | ForEach-Object { docker stop $_ }
+# for /f %i in ('docker ps -q') do docker stop %i
+# docker ps -q | xargs -r docker stop
 c-stop-all:
 	docker ps -q | xargs -r docker stop
 

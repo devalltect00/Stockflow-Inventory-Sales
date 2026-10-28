@@ -1,0 +1,6 @@
+# Exclude host dependencies and test artifacts from Linux builds.
+node_modules
+dist
+coverage
+test-results
+playwright-report
