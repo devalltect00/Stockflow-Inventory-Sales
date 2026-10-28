@@ -9,6 +9,10 @@ reduces stock; cancelling it restores stock and keeps the movement history.
 The frontend uses Vite, React Router, TanStack Query, Zod, and Lucide icons.
 The backend uses Go's `net/http`, pgx for PostgreSQL, and Goose for migrations.
 
+<a href="docs/stockflow-inventory.png">
+  <img src="docs/stockflow-inventory.png" alt="StockFlow inventory page" width="800">
+</a>
+
 The project diagrams are in [stockflow.drawio](docs/diagrams/stockflow.drawio).
 Open the file with [draw.io](https://app.diagrams.net/) to view or edit them.
 
@@ -255,5 +259,6 @@ checks would apply to backend API requests as well as the frontend.
 
 ## Time spent
 
-Estimated effort: about one working day, roughly 8 hours including breaks.
-This is an estimate; work sessions and breaks were not timed separately.
+Approximately 8 hours in total, including planning, learning, database setup,
+backend and frontend development, testing, and bug fixes. This is an estimate;
+time was not tracked precisely.
